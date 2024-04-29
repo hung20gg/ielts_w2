@@ -1,0 +1,18 @@
+**General: score**
+Overall Explanation:
+`Your detailed explanation`
+**metric_name : score**
+Explanation: 
+`Your detailed explanation`
+
+For example:
+**General: 7**
+Overall Explanation: Your explanation
+**Task Response: 6**
+Explanation: Your explanation
+**Coherence and Cohesion: 7**
+Explanation: Your explanation
+**Lexical Resource: 8**
+Explanation: Your explanation
+**Grammatical Range and Accuracy: 7**
+Explanation: Your explanation

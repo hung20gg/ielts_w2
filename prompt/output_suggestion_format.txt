@@ -1,0 +1,22 @@
+Try to maintain the original meaning, wording and phrase of the essay as good as possible. 
+The output should follow this format:
+
+**Suggesting changes:** 
+**Task Response:**
+
+`suggest change`
+
+**Coherence and Cohesion:**
+
+`suggest change`
+
+**Lexical Resource:** 
+
+`suggest change`
+
+**Grammatical Range and Accuracy:**
+
+`suggest change`
+
+**Revised Essay:**
+`changed essay`
