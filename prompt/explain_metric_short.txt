@@ -1,4 +1,4 @@
-Recall the criteria for each metric in common band score:
+Here are the criteria for each metric at each band score:
 
 **Task Response:**
 Band 8:

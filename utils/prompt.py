@@ -6,7 +6,7 @@ def get_output_suggestion_format():
         output_suggestion_format = f.read()
     return output_suggestion_format
 
-def get_system_prompt():
+def get_system_prompt(explain = True):
     
     with open('prompt/explain_metric_short.txt', 'r') as f:
         explain_metric = f.read()
@@ -16,13 +16,18 @@ def get_system_prompt():
     
     system_prompt = f"""
     You are an English teaching assistant, and you are good at grading essays, and your students need you for their IELTS Academic essay task 2. You will be given the topic and student's response.
-    You should grade the essay general score and in 4 metrics in IELTS Writing, which are `Task Response`, `Coherence and Cohesion`, `Lexical Resource` and `Grammatical Range and Accuracy`. 
-    The overall score can be a float between 0 and 9 (round to .5), but each metric score should be an integer between 0 and 9.
+    You should grade the essay general score and in 4 metrics in IELTS Writing, which are Task Response, Coherence and Cohesion, Lexical Resource and Grammatical Range and Accuracy. 
+    The overall must be the mean value of 4 metric scores and can be a float value between 0 and 9 (round to .5), but each metric score should be an integer between 0 and 9.
 
-    Recall the IELTS Writing band score criteria
+    The formula to calculate the general score is:
+    ```
+    ( ( Task_Response + Coherence_and_Cohesion + Lexical_Resource + Grammatical_Range_and_Accuracy) // 2 ) / 2 = General_score
+    ```
 
-    Here are the criteria for each metric at each band score:
-    {explain_metric}
+
+    Recall the IELTS Writing band score criteria.
+
+    {explain_metric if explain else ''}
 
     In each metric, you should give a detailed explanation and point out exactly the student mistakes that led to that score.
     Your output format should be like this:
@@ -44,11 +49,14 @@ def get_instruction_prompt(essay_topic, student_response):
     return instruction_prompt_1
 
 
-def incorrect_data(pipe, messages, general, tr, cc, lr, gr, **generation_args):
+def incorrect_data(pipe, messages, general, tr, cc, lr, gr, verbose=False, **generation_args):
     if (tr + cc + lr + gr)//2 != general * 2:
-        print("Inconsistent scoring")
-        proposed_correct_score = ((tr + cc + lr + gr+1)//2)/2
-        add_prompt = {"role": "user", "content": f"Your score doesn't make sense. How can I get a {general} in general while I only get {tr} in Task Response, {cc} in Coherence and Cohesion, {lr} in Lexical Resource and {gr} in Grammatical Range and Accuracy, which the final result is {proposed_correct_score}? You need to check the grade of my essay again, and maintain the output format"},
+        
+        if verbose:
+            print("Inconsistent scoring")
+        
+        proposed_correct_score = ((tr + cc + lr + gr)//2)/2
+        add_prompt = {"role": "user", "content": f"Your score doesn't make sense. How can I get a {general} in general while I only get {tr} in Task Response, {cc} in Coherence and Cohesion, {lr} in Lexical Resource and {gr} in Grammatical Range and Accuracy, which the general result is {proposed_correct_score}? You need to check the grade again, and maintain the output format"},
         messages.append(add_prompt[0])
         output = pipe(messages, **generation_args["model_args"])
         messages.append({"role": generation_args["role"], "content": output[0]['generated_text']},)
@@ -57,21 +65,35 @@ def incorrect_data(pipe, messages, general, tr, cc, lr, gr, **generation_args):
         return messages[-1]['content']
 
 
-def incorrect_data2(pipe, messages, general, tr, cc, lr, gr, **generation_args):
+def incorrect_data2(pipe, messages, general, tr, cc, lr, gr, verbose=False, **generation_args):
     if (tr + cc + lr + gr)//2 != general * 2:
-        print("Inconsistent scoring")
-        proposed_correct_score = ((tr + cc + lr + gr+1)//2)/2
-        add_prompt = {"role": "user", "content": f"Your score is not consistence and still does not sum up equally. You score this essay {tr} in Task Response, {cc} in Coherence and Cohesion, {lr} in Lexical Resource and {gr} in Grammatical Range and Accuracy, so the total score should be {proposed_correct_score}, which is different than your original score of {gr}. You should grade my essay again, and maintain the output format"},
+        
+        if verbose:
+            print("Inconsistent scoring")
+        
+        proposed_correct_score = ((tr + cc + lr + gr)//2)/2
+        add_prompt = {"role": "user", "content": f"Your score is not consistence and still does not sum up equally. You score this essay {tr} in Task Response, {cc} in Coherence and Cohesion, {lr} in Lexical Resource and {gr} in Grammatical Range and Accuracy, so the general score should be {proposed_correct_score}, which is different than your original score of {gr}. You should grade the essay again, and maintain the output format"},
         messages.append(add_prompt[0])
         output = pipe(messages, **generation_args["model_args"])
         messages.append({"role": generation_args["role"], "content": output[0]['generated_text']},)
         return output[0]['generated_text']
     else:
         return messages[-1]['content']
+    
+    
+def reprompt(pipe, messages, **generation_args):
+
+    add_prompt = {"role": "user", "content": f"Your score seem to have some mistake in term of logic. You should reevaluate your score and remain the output format."},
+    messages.append(add_prompt[0])
+    output = pipe(messages, **generation_args["model_args"])
+    messages.append({"role": generation_args["role"], "content": output[0]['generated_text']},)
+    return output[0]['generated_text']
+
+
 
 def rescore(pipe, messages, mode, **generation_args):
     adj = 'strict' if mode == 'harsh' else 'loose'
-    messages.append({"role": "user", "content": f"Do you think you are too {mode}? Your explanation for each metric seems to be too {adj} and may not fit with its criteria. You should reevaluate your score and remain the output format and make sure all the criteria scores is integer and only general score can be float (round to .5)."})
+    messages.append({"role": "user", "content": f"Do you think you are too {mode}? Your explanation for each metric seems to be too {adj} and may not fit with its criteria. You should reevaluate your score and remain the output format. Make sure all the criteria scores is integer and only general score can be float (round to .5)."})
     
     output = pipe(messages, **generation_args["model_args"])
     messages.append({"role": generation_args["role"], "content": output[0]['generated_text']},)
@@ -85,21 +107,28 @@ def indepth_feedback(pipe, messages, **generation_args):
     return output[0]['generated_text']
 
 
-def until_correct(pipe, messages, **generation_args):
+def until_correct(pipe, messages, verbose=False, **generation_args):
     loop_count = 0
     general, tr, cc, lr, gr = get_score(messages[-1]['content'])
     result = messages[-1]['content']
     while (tr + cc + lr + gr)//2 != general*2 or int(tr) != tr or int(cc) != cc or int(lr) != lr or int(gr) != gr:
         loop_count+=1
-        print(f"______Adjusting score {loop_count}_______")
+
+        if verbose:
+            print(f"______Adjusting score {loop_count}_______")
+        
+        if loop_count%3 == 0:
+            result = reprompt(pipe, messages**generation_args)
+        
         if loop_count%2 == 0:
-            result = incorrect_data2(pipe, messages, general, tr, cc, lr, gr, **generation_args)
+            result = incorrect_data2(pipe, messages, general, tr, cc, lr, gr, verbose, **generation_args)
         else:
-            result = incorrect_data(pipe, messages, general, tr, cc, lr, gr, **generation_args)
+            result = incorrect_data(pipe, messages, general, tr, cc, lr, gr, verbose, **generation_args)
         
         general, tr, cc, lr, gr = get_score(result)
         result = not_integer(pipe, messages, tr, cc, lr, gr, **generation_args)
         general, tr, cc, lr, gr = get_score(result)
+        
         if loop_count > 4:
             break
     
