@@ -1,17 +1,20 @@
 
 from .extract import get_score
+import os
+# print()
+DIR  = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 def get_output_suggestion_format():
-    with open('prompt/output_suggestion_format.txt', 'r') as f:
+    with open(DIR+'/prompt/output_suggestion_format.txt', 'r') as f:
         output_suggestion_format = f.read()
     return output_suggestion_format
 
 def get_system_prompt(explain = True, incontext = False):
     
-    with open('prompt/explain_metric_short.txt', 'r') as f:
+    with open(DIR+'/prompt/explain_metric_short.txt', 'r') as f:
         explain_metric = f.read()
         
-    with open('prompt/output_format.txt', 'r') as f:
+    with open(DIR+'/prompt/output_format.txt', 'r') as f:
         output_format = f.read()
     
     if incontext:

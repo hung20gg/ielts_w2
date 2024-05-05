@@ -1,9 +1,14 @@
+import sys,os
+sys.path.append(os.getcwd())
+
+print(sys.path)
+
 from transformers import pipeline, AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
-from utils.extract import get_score, clean_output, get_essay,  get_output_suggestion_format
-from utils.prompt import get_system_prompt, get_instruction_prompt, get_incontext_prompt
+from .utils.extract import get_score, clean_output, get_essay
+from .utils.prompt import get_system_prompt, get_instruction_prompt, get_incontext_prompt,  get_output_suggestion_format
 import torch
 
-from utils.embedding import SBert, ClusterRAG
+from .utils.embedding import ClusterRAG
 
 class IELTSBot:
     
