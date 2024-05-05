@@ -1,4 +1,4 @@
-from transformers import pipeline, AutoModelForCausalLM, AutoTokenizer
+from transformers import pipeline, AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
 from utils.extract import get_score, clean_output, get_essay,  get_output_suggestion_format
 from utils.prompt import get_system_prompt, get_instruction_prompt, get_incontext_prompt
 import torch
@@ -16,6 +16,7 @@ class IELTSBot:
                  model_name = "meta-llama/Meta-Llama-3-8B-Instruct", 
                  model_embedding = 'sentence-transformers/all-mpnet-base-v2',
                  explain_metric = True, 
+                 load_in_8bit=False,
                  verbose = False,
                  rag = False, **generation_args):
         
@@ -25,11 +26,18 @@ class IELTSBot:
         self.model_name = model_name
         self.model_embedding = model_embedding
         
+        # if load_in_8bit:
+        #     nf8_config = BitsAndBytesConfig(
+        #         load_in_8bit=True,
+        #         bnb_4bit_compute_dtype=torch.bfloat16
+        #         )
+            
         self.model = AutoModelForCausalLM.from_pretrained(
             model_name, 
             device_map = self.device, 
-            torch_dtype = "auto", 
+            torch_dtype = 'auto', 
             trust_remote_code = True, 
+            load_in_8bit = load_in_8bit
         )
         self.tokenizer = AutoTokenizer.from_pretrained(model_name)
         self.model.generation_config.pad_token_id = self.tokenizer.eos_token_id
