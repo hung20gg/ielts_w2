@@ -16,7 +16,7 @@ class IELTSBot:
                  model_name = "meta-llama/Meta-Llama-3-8B-Instruct", 
                  model_embedding = 'sentence-transformers/all-mpnet-base-v2',
                  explain_metric = True, 
-                 load_in_8bit=False,
+                 quantization='auto',
                  verbose = False,
                  rag = False, **generation_args):
         
@@ -26,19 +26,39 @@ class IELTSBot:
         self.model_name = model_name
         self.model_embedding = model_embedding
         
-        # if load_in_8bit:
-        #     nf8_config = BitsAndBytesConfig(
-        #         load_in_8bit=True,
-        #         bnb_4bit_compute_dtype=torch.bfloat16
-        #         )
-            
-        self.model = AutoModelForCausalLM.from_pretrained(
-            model_name, 
-            device_map = self.device, 
-            torch_dtype = 'auto', 
-            trust_remote_code = True, 
-            load_in_8bit = load_in_8bit
-        )
+        if quantization == 'int4':
+            print("Using int4")
+            nf4_config = BitsAndBytesConfig(
+                load_in_4bit=True,
+                bnb_4bit_compute_dtype=torch.bfloat16
+                )
+            self.model = AutoModelForCausalLM.from_pretrained(
+                model_name, 
+                device_map = self.device, 
+                torch_dtype = 'auto', 
+                trust_remote_code = True, 
+                quantization_config = nf4_config
+            )
+        elif quantization == 'int8':
+            print("Using int8")
+            nf8_config = BitsAndBytesConfig(
+                load_in_8bit=True,
+                bnb_8bit_compute_dtype=torch.bfloat16
+                )
+            self.model = AutoModelForCausalLM.from_pretrained(
+                model_name, 
+                device_map = self.device, 
+                torch_dtype = 'auto', 
+                trust_remote_code = True, 
+                quantization_config=nf8_config
+            )
+        else:
+            self.model = AutoModelForCausalLM.from_pretrained(
+                model_name, 
+                device_map = self.device, 
+                torch_dtype = 'auto', 
+                trust_remote_code = True, 
+            )
         self.tokenizer = AutoTokenizer.from_pretrained(model_name)
         self.model.generation_config.pad_token_id = self.tokenizer.eos_token_id
         

@@ -53,7 +53,13 @@ Your output format should be like this:
 {output_format}
 
 - The overall score should be the mean value of 4 metric scores, round down to .0 and .5, so make sure your evaluation right.
-- Provide constructive feedback."""
+- Provide constructive feedback.
+
+Here is some tips for you:
+- Most of the essay should be written in the third person.
+- The essay grade mostly around 5.0 - 7.5.
+- Every essay that has more than 250 words with little spelling or grammatical errors will score at least a 5.0.
+"""
     
     return system_prompt
 
