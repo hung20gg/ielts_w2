@@ -1,6 +1,6 @@
 from transformers import pipeline, AutoModelForCausalLM, AutoTokenizer
 from utils.extract import get_score, clean_output, get_essay,  get_output_suggestion_format
-from utils.prompt import get_system_prompt, get_instruction_prompt
+from utils.prompt import get_system_prompt, get_instruction_prompt, get_incontext_prompt
 import torch
 
 from utils.embedding import SBert, ClusterRAG
@@ -14,9 +14,12 @@ class IELTSBot:
     
     def __init__(self, role='assistant', 
                  model_name = "meta-llama/Meta-Llama-3-8B-Instruct", 
-                 model_embedding = 'sentence-transformers/all-MiniLM-L6-v2',
-                 explain_metric = True, **generation_args):
+                 model_embedding = 'sentence-transformers/all-mpnet-base-v2',
+                 explain_metric = True, 
+                 verbose = False,
+                 rag = False, **generation_args):
         
+        self.explain_metric = explain_metric
         self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
         self.system_prompt = get_system_prompt(explain_metric)
         self.model_name = model_name
@@ -36,6 +39,8 @@ class IELTSBot:
             tokenizer = self.tokenizer,
         )
         self.role = role
+        self._setup_system_messages()
+        
         if generation_args:
             self.generation_args = generation_args
         else:
@@ -47,7 +52,16 @@ class IELTSBot:
                 "do_sample": True,  
             }
         self.mode = 'easy'
-        if 'llama' in model_name:
+        
+        self.is_rag = rag
+        if rag:
+            self.setup_rag(model_embedding)
+            
+        self.verbose = verbose
+        self.clear_messages()
+    
+    def _setup_system_messages(self):
+        if 'llama' in self.model_name:
             self.mode = 'harsh'
             self.system_messages = [
                 # {"role": "user", "content": system_prompt},
@@ -57,15 +71,21 @@ class IELTSBot:
         else:
             self.system_messages = [
                 {"role": "user", "content": self.system_prompt},
-                {"role": role, "content": "Sure, I will be happy to help you with that"},
+                {"role": self.role, "content": "Sure, I will be happy to help you with that"},
             ]
-            
-        # self.rag = ClusterRAG(model_embedding)
-            
-        self.clear_messages()
         
+    def setup_rag(self, model_embedding='sentence-transformers/all-mpnet-base-v2', df_path='data/lookup_essay.csv'):
+        self.is_rag = True
+        self.rag = ClusterRAG(model_embedding, is_cluster=False, df_path=df_path)
+        self.clear_messages()
+    
+    def remove_rag(self):
+        self.is_rag = False
+        self.rag = None
+        self.clear_messages()
     
     def clear_messages(self):
+        self._setup_system_messages()
         self.messages = self.system_messages.copy()
         self.generated = False
         self.rescore = False
@@ -116,7 +136,9 @@ class IELTSBot:
         print("Please provide new prompt")        
     
     def change_system_prompt_criteria(self, criteria = False):
+        self.explain_metric = criteria
         self.system_prompt = get_system_prompt(criteria)
+        self.clear_messages()
         
     def add_adapter(self, adapter_name):
         self.model.load_adapter(adapter_name)
@@ -133,10 +155,11 @@ class IELTSBot:
     
     def _incorrect_data(self):
         if not self._check_score_valid():
-            print("Inconsistent scoring")
+            if self.verbose:
+                print("Inconsistent scoring")
             
             proposed_correct_score = ((self.tr + self.cc + self.lr + self.gr)//2)/2
-            add_prompt = {"role": "user", "content": f"Your score doesn't make sense. How can I get a {self.general} in general while I only get {self.tr} in Task Response, {self.cc} in Coherence and Cohesion, {self.lr} in Lexical Resource and {self.gr} in Grammatical Range and Accuracy, which the final result should be {proposed_correct_score}? You need to check the grade again, and maintain the output format"},
+            add_prompt = {"role": "user", "content": f"Your score doesn't make sense. How can I get a {self.general} in general while I only get {self.tr} in Task Response, {self.cc} in Coherence and Cohesion, {self.lr} in Lexical Resource and {self.gr} in Grammatical Range and Accuracy. You need to check the grade again, and maintain the output format"},
             self.messages.append(add_prompt[0])
             output = self.pipe(self.messages, **self.generation_args)
             self.messages.append({"role": self.role, "content": output[0]['generated_text']},)
@@ -148,10 +171,12 @@ class IELTSBot:
     
     def _incorrect_data2(self):
         if not self._check_score_valid():
-            print("Inconsistent scoring")
+            if self.verbose:
+                print("Inconsistent scoring")
+                
             proposed_correct_score = ((self.tr + self.cc + self.lr + self.gr)//2)/2
             
-            add_prompt = {"role": "user", "content": f"Your score is not consistence and still does not sum up equally. You score this essay {self.tr} in Task Response, {self.cc} in Coherence and Cohesion, {self.lr} in Lexical Resource and {self.gr} in Grammatical Range and Accuracy, so the total score should be {proposed_correct_score}, which is different than your original score of {self.gr}. You should grade the essay again, and maintain the output format"},
+            add_prompt = {"role": "user", "content": f"Your score is not consistence and still does not sum up equally. You score this essay {self.tr} in Task Response, {self.cc} in Coherence and Cohesion, {self.lr} in Lexical Resource and {self.gr} in Grammatical Range and Accuracy, so the total score should be {proposed_correct_score}. You should grade the essay again, and maintain the output format"},
             self.messages.append(add_prompt[0])
             output = self.pipe(self.messages, **self.generation_args)
             self.messages.append({"role": self.role, "content": output[0]['generated_text']},)
@@ -203,7 +228,8 @@ class IELTSBot:
             prompt_gr_score = f'Grammatical Range an Accuracy score is {self.gr}, which is not an integer. '    
             
         if flag == True:
-            print("Not integer")
+            if self.verbose:
+                print("Not integer")
             
             add_prompt = {"role": "user", "content": f"Your score seem incorrect. {prompt_tr_score}{prompt_cc_score }{prompt_lr_score }{prompt_gr_score}. You should look again your score and make sure all the criteria scores is integer and only general score can be float (round to .5). Maintain the output format"},
             self.messages.append(add_prompt[0])
@@ -215,12 +241,20 @@ class IELTSBot:
         
         
     def _until_correct(self):
+        """
+        This function will keep adjusting the score until it is correct
+        
+        Adjusting score will be done by reprompting until the score satisfied or reach a certain limit
+        """
         loop_count = 0
         self.general, self.tr, self.cc, self.lr, self.gr = get_score(self.messages[-1]['content'])
         result = self.messages[-1]['content']
         while not self._check_score_valid(check_int=True):
             loop_count+=1
-            print(f"______Adjusting score {loop_count}_______")
+            
+            if self.verbose:
+                print(f"______Adjusting score {loop_count}_______")
+                
             if loop_count%3 == 0:
                 result = self._reprompt()
             elif loop_count%2 == 0:
@@ -236,7 +270,42 @@ class IELTSBot:
         
         return result
     
+    def incontext_prompt(self, essay_topic, student_response):
+        """ Using RAG to get incontext example
+        """
+        system_prompt_1, system_prompt_2 = get_system_prompt(incontext=True, explain=self.explain_metric)
+        
+        if 'llama' in self.model_name:
+            self.messages = [
+                # {"role": "user", "content": system_prompt},
+                # {"role": chatbot_role, "content": "Sure"},
+                {"role": "system", "content": system_prompt_1},
+            ]
+        else:
+            self.messages = [
+                {"role": "user", "content": system_prompt_1},
+                {"role": self.role, "content": "Sure, I will be happy to help you with that"},
+            ]
+        
+        topics, essays, comments = self.rag.retrieve(essay_topic, student_response, topk=3)
+        for topic, essay, comment in zip(topics, essays, comments):
+            incontext_prompt = get_incontext_prompt(topic, essay)
+            self.messages.append({"role": "user", "content": incontext_prompt})
+            self.messages.append({"role": self.role, "content": comment})
+
+        self.messages.append({"role": "user", "content": system_prompt_2 + get_instruction_prompt(self.topic, self.essay)})
+    
     def generate_response(self, essay_topic, student_response, is_rescore=False):
+        """Receive the essay topic and student response, then generate the scoring for the essay
+
+        Args:
+            essay_topic (str): the topic of the essay
+            student_response (str): the student response
+            is_rescore (bool, optional): _description_. Defaults to False.
+
+        Returns:
+            _type_: chatbot response
+        """
         if self.generated:
             print("Already generated, clearing messages if you want to generate again")
             return self.messages[-1]['content']
@@ -244,8 +313,13 @@ class IELTSBot:
         self.rescore = is_rescore
         self.essay = student_response
         self.topic = essay_topic
+        
         self.instruction_prompt = get_instruction_prompt(self.topic, self.essay)
-        self.messages.append({"role": "user", "content": self.instruction_prompt})
+        
+        if not self.is_rag:
+            self.messages.append({"role": "user", "content": self.instruction_prompt})
+        else:
+            self.incontext_prompt(essay_topic, student_response)
         
         self.generated = True
         output = self.pipe(self.messages, **self.generation_args)
@@ -254,7 +328,7 @@ class IELTSBot:
         
         adjusted_output = self._until_correct()
         self.original_output = clean_output(adjusted_output)
-        
+        self.rag_messages = self.messages.copy()
         self.messages = self.system_messages.copy()
         self.messages.append({"role": "user", "content": self.instruction_prompt})
         self.messages.append({"role": self.role, "content": self.original_output})

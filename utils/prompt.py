@@ -6,7 +6,7 @@ def get_output_suggestion_format():
         output_suggestion_format = f.read()
     return output_suggestion_format
 
-def get_system_prompt(explain = True):
+def get_system_prompt(explain = True, incontext = False):
     
     with open('prompt/explain_metric_short.txt', 'r') as f:
         explain_metric = f.read()
@@ -14,39 +14,69 @@ def get_system_prompt(explain = True):
     with open('prompt/output_format.txt', 'r') as f:
         output_format = f.read()
     
-    system_prompt = f"""
-    You are an English teaching assistant, and you are good at grading essays, and your students need you for their IELTS Academic essay task 2. You will be given the topic and student's response.
-    You should grade the essay general score and in 4 metrics in IELTS Writing, which are Task Response, Coherence and Cohesion, Lexical Resource and Grammatical Range and Accuracy. 
-    The overall must be the mean value of 4 metric scores and can be a float value between 0 and 9 (round to .5), but each metric score should be an integer between 0 and 9.
+    if incontext:
+        system_prompt_1 = "You are an English teaching assistant, and you are good at evaluating essays, and your students need you for their IELTS Academic essay task 2. You will make evaluation based on the topic and student's response."
+        system_prompt_2 = f"""
+You should grade the essay general score and in 4 metrics in IELTS Writing, which are Task Response, Coherence and Cohesion, Lexical Resource and Grammatical Range and Accuracy. 
+The overall must be the mean value of 4 metric scores and can be a float value between 0 and 9 (round to .5), but each metric score should be an integer between 0 and 9.
+Recall the IELTS Writing band score criteria.
+{explain_metric if explain else ''}
+The formula to calculate the general score is:
+```
+General_score = ( ( Task_Response + Coherence_and_Cohesion + Lexical_Resource + Grammatical_Range_and_Accuracy) // 2 ) / 2 
+```
 
-    The formula to calculate the general score is:
-    ```
-    ( ( Task_Response + Coherence_and_Cohesion + Lexical_Resource + Grammatical_Range_and_Accuracy) // 2 ) / 2 = General_score
-    ```
+In each metric, you should give a detailed explanation and point out exactly the student mistakes that led to that score.
+Your output format should be like this:
+{output_format}
 
-
-    Recall the IELTS Writing band score criteria.
-
-    {explain_metric if explain else ''}
-
-    In each metric, you should give a detailed explanation and point out exactly the student mistakes that led to that score.
-    Your output format should be like this:
-    {output_format}
-
-    - The overall score should be the mean value of 4 metric scores, round down to .0 and .5, so make sure your evaluation right.
-    - Provide constructive feedback.
+- The overall score should be the mean value of 4 metric scores, round down to .5, so make sure your evaluation right.
+- Provide constructive feedback.
     """
+    
+        return system_prompt_1, system_prompt_2
+    
+    
+    system_prompt = f"""
+You are an English teaching assistant, and you are good at evaluating essays, and your students need you for their IELTS Academic essay task 2. You will make evaluation based on the topic and student's response.
+You should grade the essay general score and in 4 metrics in IELTS Writing, which are Task Response, Coherence and Cohesion, Lexical Resource and Grammatical Range and Accuracy. 
+The overall must be the mean value of 4 metric scores and can be a float value between 0 and 9 (round to .5), but each metric score should be an integer between 0 and 9.
+Recall the IELTS Writing band score criteria.
+{explain_metric if explain else ''}
+The formula to calculate the general score is:
+```
+General_score = ( ( Task_Response + Coherence_and_Cohesion + Lexical_Resource + Grammatical_Range_and_Accuracy) // 2 ) / 2 
+```
+
+In each metric, you should give a detailed explanation and point out exactly the student mistakes that led to that score.
+Your output format should be like this:
+{output_format}
+
+- The overall score should be the mean value of 4 metric scores, round down to .0 and .5, so make sure your evaluation right.
+- Provide constructive feedback."""
+    
     return system_prompt
 
 
 def get_instruction_prompt(essay_topic, student_response):
     instruction_prompt_1 = f"""
-    You will have to grade this essay in IELTS WRITING task 2 academic guideline
-    Here is the topic of the essay: {essay_topic}
-    And here is my essay: {student_response}
-    Make sure that you follow the IELTS WRITING task 2 guideline to grade this essay, and do the correct evaluation of general score.
+You will have to grade this essay in IELTS WRITING task 2 academic guideline
+Topic of the essay: {essay_topic}
+Essay: 
+{student_response}
+Make sure that you follow the IELTS WRITING task 2 guideline to grade this essay, and do the correct evaluation of general score.
     """
     return instruction_prompt_1
+
+def get_incontext_prompt(topic, example_essay):
+    incontext_prompt = f"""
+You will have to give comment to this IELTS WRITING task 2 essay.
+Topic: 
+{topic}
+Essay:
+{example_essay}
+"""
+    return incontext_prompt
 
 
 def incorrect_data(pipe, messages, general, tr, cc, lr, gr, verbose=False, **generation_args):
