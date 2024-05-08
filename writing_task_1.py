@@ -181,3 +181,9 @@ class AgentWT1(AgentWT2):
         self.messages.append({"role": "user", "content": self.instruction_prompt})
         self.messages.append({"role": self.role, "content": self.original_output})
         
+        if self.rescore:
+            self._rescore()
+            rescore_output = self._until_correct()
+            self.rescore_output = clean_output(rescore_output)
+            return self.rescore_output
+        return self.original_output
