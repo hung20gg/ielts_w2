@@ -306,7 +306,7 @@ class AgentWT2:
         self.essay = student_response
         self.topic = essay_topic
         
-        self.instruction_prompt = self.get_instruction_prompt(self.topic, self.essay)
+        self.instruction_prompt = self.get_instruction_prompt()
         
         if not self.is_rag:
             self.messages.append({"role": "user", "content": self.instruction_prompt})
