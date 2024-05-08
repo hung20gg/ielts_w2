@@ -1,6 +1,3 @@
-import sys,os
-sys.path.append(os.getcwd())
-
 from transformers import pipeline, AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
 from .utils.extract import get_score, clean_output, get_essay
 from .utils.prompt import get_system_prompt, get_instruction_prompt, get_incontext_prompt,  get_output_suggestion_format
@@ -8,61 +5,29 @@ import torch
 
 from .utils.embedding import ClusterRAG
 
-
-from huggingface_hub import login
-login("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") 
-
-class IELTSBot:
+class AgentWT2:
     
     # This class will only use prompting technique to generate the scoring
     
-    
-    output_suggestion = get_output_suggestion_format()
-    
-    def __init__(self, role='assistant', 
-                 model_name = "meta-llama/Meta-Llama-3-8B-Instruct", 
+    def __init__(self, 
+                 pipe,
+                 role='assistant', 
+                 agent = 'task2',
                  model_embedding = 'sentence-transformers/all-mpnet-base-v2',
                  explain_metric = True, 
-                 quantization='auto',
                  verbose = False,
                  rag = False, **generation_args):
         
         self.explain_metric = explain_metric
         self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
         self.system_prompt = self.get_system_prompt(explain_metric)
-        self.model_name = model_name
+        self.pipe = pipe
+        self.model_name = self.pipe.model_name
         self.model_embedding = model_embedding
+        self.agent = agent
+        self.output_suggestion = get_output_suggestion_format()
+        self.essay_type = 'essay'
         
-        quantization_config = None
-        if quantization == 'int4':
-            print("Using int4")
-            quantization_config = BitsAndBytesConfig(
-                load_in_4bit=True,
-                bnb_4bit_compute_dtype=torch.bfloat16
-                )
-
-        elif quantization == 'int8':
-            print("Using int8")
-            quantization_config = BitsAndBytesConfig(
-                load_in_8bit=True,
-                bnb_8bit_compute_dtype=torch.bfloat16
-                )
-
-        self.model = AutoModelForCausalLM.from_pretrained(
-            model_name, 
-            device_map = self.device, 
-            torch_dtype = torch.bfloat16, 
-            trust_remote_code = True, 
-            quantization_config = quantization_config
-        )
-        
-        self.tokenizer = AutoTokenizer.from_pretrained(model_name)
-        self.model.generation_config.pad_token_id = self.tokenizer.eos_token_id
-        
-        self.pipe = pipeline("text-generation",
-            model = self.model,
-            tokenizer = self.tokenizer,
-        )
         self.role = role
         self._setup_system_messages()
         
@@ -89,8 +54,6 @@ class IELTSBot:
         if 'llama' in self.model_name:
             self.mode = 'harsh'
             self.system_messages = [
-                # {"role": "user", "content": system_prompt},
-                # {"role": chatbot_role, "content": "Sure"},
                 {"role": "system", "content": self.system_prompt},
             ]
         else:
@@ -162,15 +125,13 @@ class IELTSBot:
         if new_prompt:
             self.system_prompt = new_prompt
             return
-        print("Please provide new prompt")        
+        print("Please provide new prompt, if not the prompt remain the same")        
     
     def change_system_prompt_criteria(self, criteria = False):
         self.explain_metric = criteria
         self.system_prompt = self.get_system_prompt(criteria)
         self.clear_messages()
         
-    def add_adapter(self, adapter_name):
-        self.model.load_adapter(adapter_name)
     
     def _check_score_valid(self, check_int=False):
         if (self.tr + self.cc + self.lr + self.gr)//2 != self.general * 2:
@@ -205,7 +166,7 @@ class IELTSBot:
                 
             proposed_correct_score = ((self.tr + self.cc + self.lr + self.gr)//2)/2
             
-            add_prompt = {"role": "user", "content": f"Your score is not consistence and still does not sum up equally. You score this essay {self.tr} in Task Response, {self.cc} in Coherence and Cohesion, {self.lr} in Lexical Resource and {self.gr} in Grammatical Range and Accuracy, so the total score should be {proposed_correct_score}. You should grade the essay again, and maintain the output format"},
+            add_prompt = {"role": "user", "content": f"Your score is not consistence and still does not sum up equally. You score this {self.essay_type} {self.tr} in Task Response, {self.cc} in Coherence and Cohesion, {self.lr} in Lexical Resource and {self.gr} in Grammatical Range and Accuracy, so the total score should be {proposed_correct_score}. You should grade the {self.essay_type} again, and maintain the output format"},
             self.messages.append(add_prompt[0])
             output = self.pipe(self.messages, **self.generation_args)
             self.messages.append({"role": self.role, "content": output[0]['generated_text']},)
@@ -306,8 +267,6 @@ class IELTSBot:
         
         if 'llama' in self.model_name:
             self.messages = [
-                # {"role": "user", "content": system_prompt},
-                # {"role": chatbot_role, "content": "Sure"},
                 {"role": "system", "content": system_prompt_1},
             ]
         else:
@@ -323,6 +282,10 @@ class IELTSBot:
             self.messages.append({"role": self.role, "content": comment})
 
         self.messages.append({"role": "user", "content": system_prompt_2 + get_instruction_prompt(self.topic, self.essay)})
+    
+    def get_instruction_prompt(self):
+        return get_instruction_prompt(self.topic, self.essay)
+    
     
     def generate_response(self, essay_topic, student_response, is_rescore=False):
         """Receive the essay topic and student response, then generate the scoring for the essay
@@ -343,7 +306,7 @@ class IELTSBot:
         self.essay = student_response
         self.topic = essay_topic
         
-        self.instruction_prompt = get_instruction_prompt(self.topic, self.essay)
+        self.instruction_prompt = self.get_instruction_prompt(self.topic, self.essay)
         
         if not self.is_rag:
             self.messages.append({"role": "user", "content": self.instruction_prompt})
@@ -359,6 +322,7 @@ class IELTSBot:
         self.original_output = clean_output(adjusted_output)
         self.rag_messages = self.messages.copy()
         self.messages = self.system_messages.copy()
+        
         self.messages.append({"role": "user", "content": self.instruction_prompt})
         self.messages.append({"role": self.role, "content": self.original_output})
         
@@ -382,7 +346,7 @@ class IELTSBot:
         self.messages = self.system_messages.copy()
         self.messages.append({"role": "user", "content": self.instruction_prompt})
         self.messages.append({"role": self.role, "content": first_output})
-        self.messages.append({"role": "user", "content": f"Provide more in-depth feedback in the essay, list out all the mistake made in the essay and suggest how to improve it. It is good to list all the grammatical mistake such as spelling, punctuation, grammar. \n {self.output_suggestion}"})
+        self.messages.append({"role": "user", "content": f"Provide more in-depth feedback in the {self.essay_type}, list out all the mistake made in the {self.essay_type} and suggest how to improve it. It is good to list all the grammatical mistake such as spelling, punctuation, grammar. \n {self.output_suggestion}"})
         
         output = self.pipe(self.messages, **self.generation_args)
         self.messages.append({"role": self.role, "content": output[0]['generated_text']},)
@@ -401,11 +365,11 @@ class IELTSBot:
             self.indepth_feedback(force_original=True)
         
         if self.general <= MAX_TARGET - 0.5:
-            self.messages.append({"role": "user", "content": f"Making adjustment directly into the essay to improve at least 1 score in each metric. {self.output_suggestion}"})
+            self.messages.append({"role": "user", "content": f"Making adjustment directly into the {self.essay_type} to improve at least 1 score in each metric. {self.output_suggestion}"})
             suggest_essay = self.pipe(self.messages, **self.generation_args)
             
         else: 
-            self.messages.append({"role": "user", "content": f"Making adjustment directly into the essay to optimize the essay. {self.output_suggestion}"})
+            self.messages.append({"role": "user", "content": f"Making adjustment directly into the {self.essay_type} to optimize it. {self.output_suggestion}"})
             suggest_essay = self.pipe(self.messages, **self.generation_args)
             
         self.messages.append({"role": self.role, "content": suggest_essay[0]['generated_text']},)
@@ -413,5 +377,3 @@ class IELTSBot:
         self.revived_essay = get_essay(suggest_essay[0]['generated_text'])
         return suggest_essay
     
-if __name__ == '__main__':
-    bot = IELTSBot()

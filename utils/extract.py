@@ -21,6 +21,15 @@ def get_score(output):
     match = re.search(r'General\s?:\s?((?<!\d)\d+(?:\.\d+)?)', output)
     if match:
         general = float(match.group(1))
+        
+    match = re.search(r'General Score\s?:\s?((?<!\d)\d+(?:\.\d+)?)', output)
+    if match:
+        general = float(match.group(1))   
+        
+    match = re.search(r'Overall Score\s?:\s?((?<!\d)\d+(?:\.\d+)?)', output)
+    if match:
+        general = float(match.group(1)) 
+         
     match = re.search(r'Task Response\s?:\s?((?<!\d)\d+(?:\.\d+)?)', output)
     if match:
         tr = float(match.group(1))

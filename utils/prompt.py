@@ -9,7 +9,44 @@ def get_output_suggestion_format():
         output_suggestion_format = f.read()
     return output_suggestion_format
 
-def get_system_prompt(explain = True, incontext = False):
+
+def get_system_prompt_wt1(explain = False):
+    with open(DIR+'/prompt/explain_metric_short.txt', 'r') as f:
+        explain_metric = f.read()
+        
+    with open(DIR+'/prompt/output_format.txt', 'r') as f:
+        output_format = f.read()
+        
+    system_prompt_wt1 =f"""
+You are an English teaching assistant, and you are good at evaluating essays and reports, and your students need you for their IELTS Academic writing task 1. You will make evaluations based on the topic and the student's response. 
+However, since you cannot see the images of charts or diagrams, you will be given a verbal description of them. Sometimes, the description may not be very detailed, or they might contain false information, so just use it as a reference.
+
+You should grade the report's general score and its 4 metrics in IELTS Writing task 1, which are Task Response, Coherence and Cohesion, Lexical Resource and Grammatical Range and Accuracy. 
+The overall must be the mean value of 4 metrics' score and can be a float value between 1 and 9 (round to .5), but each metric score must be an integer between 0 and 9.
+Recall the IELTS Writing task 1 band score criteria.
+{explain_metric if explain else ''}
+The formula to calculate the general score is:
+```
+General_score = ( ( Task_Response + Coherence_and_Cohesion + Lexical_Resource + Grammatical_Range_and_Accuracy) // 2 ) / 2 
+```
+
+In each metric, you should give a detailed explanation and point out exactly the student mistakes that led to that score.
+Your output format should be like this:
+{output_format}
+
+Here is some tips for you:
+- Most of the reports should be written in the third person.
+- The report should not have any subjective and personal opinion.
+- The report's grade range is mostly around 5.5 to 8.0.
+- Every report that has more than 150 words with little spelling or grammatical errors will score at least a 5.5.
+- Any attempt of using complex sentences might have at least 4.5 in Grammatical Range and Accuracy.
+- The overall score should be the mean value of 4 metric scores, round down to .0 and .5, so make sure your evaluation right.
+- Provide constructive feedback.
+"""  
+    return system_prompt_wt1
+    
+
+def get_system_prompt(explain = False, incontext = False):
     
     with open(DIR+'/prompt/explain_metric_short.txt', 'r') as f:
         explain_metric = f.read()
@@ -20,12 +57,11 @@ def get_system_prompt(explain = True, incontext = False):
     if incontext:
         system_prompt_1 = "You are an English teaching assistant, and you are good at evaluating essays, and your students need you for their IELTS Academic essay task 2. You will make evaluation based on the topic and student's response."
         system_prompt_2 = f"""
-You should grade the essay general score and in 4 metrics in IELTS Writing, which are Task Response, Coherence and Cohesion, Lexical Resource and Grammatical Range and Accuracy. 
-The overall must be the mean value of 4 metric scores and can be a float value between 0 and 9 (round to .5), but each metric score should be an integer between 0 and 9.
-Recall the IELTS Writing band score criteria.
+You should grade the essay's general score and its 4 metrics in IELTS Writing task 2, which are Task Response, Coherence and Cohesion, Lexical Resource and Grammatical Range and Accuracy. 
+The overall must be the mean value of 4 metrics' score and can be a float value between 1 and 9 (round to .5), but each metric's score must be an integer between 0 and 9.
+Recall the IELTS Writing task 2 band score criteria.
 {explain_metric if explain else ''}
 The formula to calculate the general score is:
-```
 General_score = ( ( Task_Response + Coherence_and_Cohesion + Lexical_Resource + Grammatical_Range_and_Accuracy) // 2 ) / 2 
 ```
 
@@ -33,18 +69,23 @@ In each metric, you should give a detailed explanation and point out exactly the
 Your output format should be like this:
 {output_format}
 
-- The overall score should be the mean value of 4 metric scores, round down to .5, so make sure your evaluation right.
+Here is some tips for you:
+- Most of the essay should be written in the third person.
+- The essay's grade range is mostly around 5.0 - 7.5.
+- Every essay that has more than 250 words with little spelling or grammatical errors will score at least a 5.0.
+- Any attempt of using complex sentences might have at least 4.5 in Grammatical Range and Accuracy.
+- The overall score should be the mean value of 4 metric scores, round down to .0 and .5, so make sure your evaluation right.
 - Provide constructive feedback.
-    """
+"""
     
         return system_prompt_1, system_prompt_2
     
     
     system_prompt = f"""
-You are an English teaching assistant, and you are good at evaluating essays, and your students need you for their IELTS Academic essay task 2. You will make evaluation based on the topic and student's response.
-You should grade the essay general score and in 4 metrics in IELTS Writing, which are Task Response, Coherence and Cohesion, Lexical Resource and Grammatical Range and Accuracy. 
-The overall must be the mean value of 4 metric scores and can be a float value between 0 and 9 (round to .5), but each metric score should be an integer between 0 and 9.
-Recall the IELTS Writing band score criteria.
+You are an English teaching assistant, and you are good at evaluating essays, and your students need you for their IELTS Academic essay task 2. You will make evaluations based on the topic and the student's response.
+You should grade the essay's general score and its 4 metrics in IELTS Writing task 2, which are Task Response, Coherence and Cohesion, Lexical Resource and Grammatical Range and Accuracy. 
+The overall must be the mean value of 4 metrics' score and can be a float value between 1 and 9 (round to .5), but each metric's score must be an integer between 0 and 9.
+Recall the IELTS Writing task 2 band score criteria.
 {explain_metric if explain else ''}
 The formula to calculate the general score is:
 ```
@@ -55,27 +96,40 @@ In each metric, you should give a detailed explanation and point out exactly the
 Your output format should be like this:
 {output_format}
 
-- The overall score should be the mean value of 4 metric scores, round down to .0 and .5, so make sure your evaluation right.
-- Provide constructive feedback.
-
 Here is some tips for you:
 - Most of the essay should be written in the third person.
-- The essay grade mostly around 5.0 - 7.5.
+- The essay's grade range is mostly around 5.0 to 7.5.
 - Every essay that has more than 250 words with little spelling or grammatical errors will score at least a 5.0.
+- Any attempt of using complex sentences might have at least 4.5 in Grammatical Range and Accuracy.
+- The overall score should be the mean value of 4 metric scores, round down to .0 and .5, so make sure your evaluation right.
+- Provide constructive feedback.
 """
     
     return system_prompt
 
 
 def get_instruction_prompt(essay_topic, student_response):
-    instruction_prompt_1 = f"""
+    instruction_prompt = f"""
 You will have to grade this essay in IELTS WRITING task 2 academic guideline
 Topic of the essay: {essay_topic}
 Essay: 
 {student_response}
 Make sure that you follow the IELTS WRITING task 2 guideline to grade this essay, and do the correct evaluation of general score.
     """
-    return instruction_prompt_1
+    return instruction_prompt
+
+def get_instruction_prompt_wt1(essay_topic, student_response, verbal_description):
+    instruction_prompt_wt1 = f"""
+You will have to grade this report in IELTS WRITING task 1 academic guideline
+Topic: 
+{essay_topic}
+Description of the chart or diagram:
+{verbal_description}
+Report: 
+{student_response}
+Make sure that you follow the guideline to grade this essay, and do the correct evaluation of general score.
+"""
+    return instruction_prompt_wt1
 
 def get_incontext_prompt(topic, example_essay):
     incontext_prompt = f"""

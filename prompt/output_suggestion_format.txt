@@ -4,19 +4,19 @@ The output should follow this format:
 **Suggesting changes:** 
 **Task Response:**
 
-`suggest change`
+`suggestion for change`
 
 **Coherence and Cohesion:**
 
-`suggest change`
+`suggestion for change`
 
 **Lexical Resource:** 
 
-`suggest change`
+`suggestion for change`
 
 **Grammatical Range and Accuracy:**
 
-`suggest change`
+`suggestion for change`
 
 **Revised Essay:**
 `changed essay`
