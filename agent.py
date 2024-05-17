@@ -2,6 +2,10 @@ from transformers import pipeline, AutoModelForCausalLM, AutoTokenizer, BitsAndB
 import torch
 import gc
 
+class BedrockLLMs:
+    def __init__(self,model_id):
+        self.model_id = model_id
+
 class CoreLLMs:
     def __init__(self,
                  model_name = "meta-llama/Meta-Llama-3-8B-Instruct", 
