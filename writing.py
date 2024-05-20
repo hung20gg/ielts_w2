@@ -149,7 +149,7 @@ class AgentWT2:
                 print("Inconsistent scoring")
             
             proposed_correct_score = ((self.tr + self.cc + self.lr + self.gr)//2)/2
-            add_prompt = {"role": "user", "content": f"Your score doesn't make sense. How can I get a {self.general} in general while I only get {self.tr} in Task Response, {self.cc} in Coherence and Cohesion, {self.lr} in Lexical Resource and {self.gr} in Grammatical Range and Accuracy. You need to check the grade again, and maintain the output format"},
+            add_prompt = {"role": "user", "content": f"Your score doesn't make sense. How can I get a {self.general} in general while I only get {self.tr} in Task Response, {self.cc} in Coherence and Cohesion, {self.lr} in Lexical Resource and {self.gr} in Grammatical Range and Accuracy. You need to check the grade of each criteria and overall score again. Maintain the output format"},
             self.messages.append(add_prompt[0])
             output = self.llm(self.messages, **self.generation_args)
             self.messages.append({"role": self.role, "content": output},)

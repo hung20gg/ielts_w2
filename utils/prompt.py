@@ -36,6 +36,7 @@ Your output format should be like this:
 
 Here is some tips for you:
 - Most of the reports should be written in the third person.
+- Be easy on grading report.
 - The report should not have any subjective and personal opinion.
 - The report's grade range is mostly around 5.5 to 8.0.
 - Every report that has more than 150 words with little spelling or grammatical errors will score at least a 5.5.
@@ -74,6 +75,7 @@ Your output format should be like this:
 
 Here is some tips for you:
 - Most of the essay should be written in the third person.
+- Be easy on grading essay.
 - The essay's grade range is mostly around 5.0 - 7.5.
 - Every essay that has more than 250 words with little spelling or grammatical errors will score at least a 5.0.
 - Any attempt of using complex sentences might have at least 4.5 in Grammatical Range and Accuracy.
@@ -101,6 +103,7 @@ Your output format should be like this:
 
 Here is some tips for you:
 - Most of the essay should be written in the third person.
+- Be easy on grading essay.
 - The essay's grade range is mostly around 5.0 to 7.5.
 - Every essay that has more than 250 words with little spelling or grammatical errors will score at least a 5.0.
 - Any attempt of using complex sentences might have at least 4.5 in Grammatical Range and Accuracy.
@@ -276,12 +279,12 @@ def convert_format(data, has_system=True):
         if i == 0 and item["role"] == "system":
             if has_system:
                 system_message = item["content"]
-                prompt += f"<|begin_of_text|>\n<<SYS>> {system_message} <<SYS>>\n"
+                prompt += f"<|begin_of_text|>\n<|start_header_id|>system<|end_header_id|>\n{system_message}<|eot_id|>\n"
             else:
                 sys_non_llama = item["content"]+'\n'
 
         elif item["role"] == "user":
-            if i==1:
+            if i==1 and not has_system:
                 user_message = item["content"]
                 prompt += f"<|start_header_id|>user<|end_header_id|>\n{sys_non_llama}{user_message}\n<|eot_id|>\n<|start_header_id|>assistant<|end_header_id|>\n"
             else:
@@ -289,7 +292,7 @@ def convert_format(data, has_system=True):
                 prompt += f"<|start_header_id|>user<|end_header_id|>\n{user_message}\n<|eot_id|>\n<|start_header_id|>assistant<|end_header_id|>\n"
         elif item["role"] == "assistant":
             assistant_message = item["content"]
-            prompt += f"{assistant_message}\n"
+            prompt += f"{assistant_message}\n<|eot_id|>"
 
 
     return prompt.rstrip("\n")

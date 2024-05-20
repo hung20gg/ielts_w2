@@ -73,14 +73,12 @@ class CoreLLMs:
         
 class BedRockLLMs:
     def __init__(self,
-                model_name = "meta-llama/Meta-Llama-3-8B-Instruct", 
-                model_id = "meta.llama3-8b-instruct-v1:0",
+                model_name = "meta.llama3-8b-instruct-v1:0", 
                 access_key = None,
                 secret_key = None,
                  ) -> None:
         self.client = boto3.client(service_name='bedrock-runtime', region_name="us-west-2", aws_access_key_id=access_key, aws_secret_access_key=secret_key)
-        self.model_name = model_name
-        self.model_id = model_id
+        self.model_id = model_name
 
         self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
     
