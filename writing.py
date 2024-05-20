@@ -10,7 +10,7 @@ class AgentWT2:
     # This class will only use prompting technique to generate the scoring
     
     def __init__(self, 
-                 pipe,
+                 llm,
                  role='assistant', 
                  agent = 'task2',
                  model_embedding = 'sentence-transformers/all-mpnet-base-v2',
@@ -21,8 +21,8 @@ class AgentWT2:
         self.explain_metric = explain_metric
         self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
         self.system_prompt = self.get_system_prompt(explain_metric)
-        self.pipe = pipe
-        self.model_name = self.pipe.model_name
+        self.llm = llm
+        self.model_name = self.llm.model_name
         self.model_embedding = model_embedding
         self.agent = agent
         self.output_suggestion = get_output_suggestion_format()
@@ -151,10 +151,10 @@ class AgentWT2:
             proposed_correct_score = ((self.tr + self.cc + self.lr + self.gr)//2)/2
             add_prompt = {"role": "user", "content": f"Your score doesn't make sense. How can I get a {self.general} in general while I only get {self.tr} in Task Response, {self.cc} in Coherence and Cohesion, {self.lr} in Lexical Resource and {self.gr} in Grammatical Range and Accuracy. You need to check the grade again, and maintain the output format"},
             self.messages.append(add_prompt[0])
-            output = self.pipe(self.messages, **self.generation_args)
-            self.messages.append({"role": self.role, "content": output[0]['generated_text']},)
+            output = self.llm(self.messages, **self.generation_args)
+            self.messages.append({"role": self.role, "content": output},)
             
-            return output[0]['generated_text']
+            return output
         else:
             return self.messages[-1]['content']
     
@@ -168,10 +168,10 @@ class AgentWT2:
             
             add_prompt = {"role": "user", "content": f"Your score is not consistence and still does not sum up equally. You score this {self.essay_type} {self.tr} in Task Response, {self.cc} in Coherence and Cohesion, {self.lr} in Lexical Resource and {self.gr} in Grammatical Range and Accuracy, so the total score should be {proposed_correct_score}. You should grade the {self.essay_type} again, and maintain the output format"},
             self.messages.append(add_prompt[0])
-            output = self.pipe(self.messages, **self.generation_args)
-            self.messages.append({"role": self.role, "content": output[0]['generated_text']},)
+            output = self.llm(self.messages, **self.generation_args)
+            self.messages.append({"role": self.role, "content": output},)
             
-            return output[0]['generated_text']
+            return output
         else:
             return self.messages[-1]['content']
         
@@ -179,18 +179,18 @@ class AgentWT2:
 
         add_prompt = {"role": "user", "content": f"Your score seem to have some mistake in term of logic. You should reevaluate your score and remain the output format."},
         self.messages.append(add_prompt[0])
-        output = self.pipe(self.messages, **self.generation_args)
-        self.messages.append({"role": self.role, "content": output[0]['generated_text']},)
-        return output[0]['generated_text']
+        output = self.llm(self.messages, **self.generation_args)
+        self.messages.append({"role": self.role, "content": output},)
+        return output
     
     def _rescore(self):
         adj = 'strict' if self.mode == 'harsh' else 'loose'
         
         self.messages.append({"role": "user", "content": f"Do you think you are too {self.mode}? Your explanation for each metric seems to be too {adj} and may not fit with its criteria. You should reevaluate your score and remain the output format and make sure all the criteria scores is integer and only general score can be float (round to .5)."})
         
-        output = self.pipe(self.messages, **self.generation_args)
-        self.messages.append({"role": self.role, "content": output[0]['generated_text']},)
-        return output[0]['generated_text']
+        output = self.llm(self.messages, **self.generation_args)
+        self.messages.append({"role": self.role, "content": output},)
+        return output
     
     
     def _not_integer(self):
@@ -223,9 +223,9 @@ class AgentWT2:
             
             add_prompt = {"role": "user", "content": f"Your score seem incorrect. {prompt_tr_score}{prompt_cc_score }{prompt_lr_score }{prompt_gr_score}. You should look again your score and make sure all the criteria scores is integer and only general score can be float (round to .5). Maintain the output format"},
             self.messages.append(add_prompt[0])
-            output = self.pipe(self.messages, **self.generation_args)
-            self.messages.append({"role": self.role, "content": output[0]['generated_text']},)
-            return output[0]['generated_text']
+            output = self.llm(self.messages, **self.generation_args)
+            self.messages.append({"role": self.role, "content": output},)
+            return output
         else:
             return self.messages[-1]['content']
         
@@ -287,7 +287,7 @@ class AgentWT2:
         return get_instruction_prompt(self.topic, self.essay)
     
     
-    def generate_response(self, essay_topic, student_response, is_rescore=False):
+    def generate_response(self, essay_topic, student_response, is_rescore=True):
         """Receive the essay topic and student response, then generate the scoring for the essay
 
         Args:
@@ -314,9 +314,9 @@ class AgentWT2:
             self.incontext_prompt(essay_topic, student_response)
         
         self.generated = True
-        output = self.pipe(self.messages, **self.generation_args)
-        self.messages.append({"role": self.role, "content": output[0]['generated_text']},)
-        # return output[0]['generated_text']
+        output = self.llm(self.messages, **self.generation_args)
+        self.messages.append({"role": self.role, "content": output},)
+        # return output
         
         adjusted_output = self._until_correct()
         self.original_output = clean_output(adjusted_output)
@@ -348,11 +348,11 @@ class AgentWT2:
         self.messages.append({"role": self.role, "content": first_output})
         self.messages.append({"role": "user", "content": f"Provide more in-depth feedback in the {self.essay_type}, list out all the mistake made in the {self.essay_type} and suggest how to improve it. It is good to list all the grammatical mistake such as spelling, punctuation, grammar. \n {self.output_suggestion}"})
         
-        output = self.pipe(self.messages, **self.generation_args)
-        self.messages.append({"role": self.role, "content": output[0]['generated_text']},)
+        output = self.llm(self.messages, **self.generation_args)
+        self.messages.append({"role": self.role, "content": output},)
         
         if not force_original:
-            self.feed_back = output[0]['generated_text']    
+            self.feed_back = output    
         
         return self.feed_back 
     
@@ -366,14 +366,14 @@ class AgentWT2:
         
         if self.general <= MAX_TARGET - 0.5:
             self.messages.append({"role": "user", "content": f"Making adjustment directly into the {self.essay_type} to improve at least 1 score in each metric. {self.output_suggestion}"})
-            suggest_essay = self.pipe(self.messages, **self.generation_args)
+            suggest_essay = self.llm(self.messages, **self.generation_args)
             
         else: 
             self.messages.append({"role": "user", "content": f"Making adjustment directly into the {self.essay_type} to optimize it. {self.output_suggestion}"})
-            suggest_essay = self.pipe(self.messages, **self.generation_args)
+            suggest_essay = self.llm(self.messages, **self.generation_args)
             
-        self.messages.append({"role": self.role, "content": suggest_essay[0]['generated_text']},)
+        self.messages.append({"role": self.role, "content": suggest_essay},)
         
-        self.revived_essay = get_essay(suggest_essay[0]['generated_text'])
+        self.revived_essay = get_essay(suggest_essay)
         return suggest_essay
     

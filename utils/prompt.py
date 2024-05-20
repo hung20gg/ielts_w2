@@ -42,14 +42,17 @@ Here is some tips for you:
 - Any attempt of using complex sentences might have at least 4.5 in Grammatical Range and Accuracy.
 - The overall score should be the mean value of 4 metric scores, round down to .0 and .5, so make sure your evaluation right.
 - Provide constructive feedback.
+
 """  
     return system_prompt_wt1
     
 
 def get_system_prompt(explain = False, incontext = False):
     
-    with open(DIR+'/prompt/explain_metric_short.txt', 'r') as f:
-        explain_metric = f.read()
+    # with open(DIR+'/prompt/explain_metric_short.txt', 'r') as f:
+    #     explain_metric = f.read()
+    
+    explain_metric =''
         
     with open(DIR+'/prompt/output_format.txt', 'r') as f:
         output_format = f.read()
@@ -115,6 +118,7 @@ Topic of the essay: {essay_topic}
 Essay: 
 {student_response}
 Make sure that you follow the IELTS WRITING task 2 guideline to grade this essay, and do the correct evaluation of general score.
+Let's evaluate step by step.
     """
     return instruction_prompt
 
@@ -128,6 +132,7 @@ Description of the chart or diagram:
 Report: 
 {student_response}
 Make sure that you follow the guideline to grade this essay, and do the correct evaluation of general score.
+Let's evaluate step by step.
 """
     return instruction_prompt_wt1
 
@@ -262,3 +267,29 @@ def not_integer(pipe, messages, tr, cc, lr, gr, **generation_args):
         return output[0]['generated_text']
     else:
         return messages[-1]['content']
+    
+
+def convert_format(data, has_system=True):
+    prompt = ""
+    sys_non_llama = ''
+    for i, item in enumerate(data):
+        if i == 0 and item["role"] == "system":
+            if has_system:
+                system_message = item["content"]
+                prompt += f"<|begin_of_text|>\n<<SYS>> {system_message} <<SYS>>\n"
+            else:
+                sys_non_llama = item["content"]+'\n'
+
+        elif item["role"] == "user":
+            if i==1:
+                user_message = item["content"]
+                prompt += f"<|start_header_id|>user<|end_header_id|>\n{sys_non_llama}{user_message}\n<|eot_id|>\n<|start_header_id|>assistant<|end_header_id|>\n"
+            else:
+                user_message = item["content"]
+                prompt += f"<|start_header_id|>user<|end_header_id|>\n{user_message}\n<|eot_id|>\n<|start_header_id|>assistant<|end_header_id|>\n"
+        elif item["role"] == "assistant":
+            assistant_message = item["content"]
+            prompt += f"{assistant_message}\n"
+
+
+    return prompt.rstrip("\n")

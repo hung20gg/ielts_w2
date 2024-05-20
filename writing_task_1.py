@@ -61,18 +61,18 @@ class AgentWT1(AgentWT2):
         
         self.is_diagram = True
         self._delete_chart()
-        self.pipe._delete_agent()
+        self.llm._delete_agent()
         
         self.diagram_pipe = pipeline("image-to-text",
             model = self.diagram_model_name,
-            torch_dtype='auto', device=0
+            torch_dtype=torch.bfloat16, device=0
         )
         
     def _initialize_chart(self):
         
         self.is_chart = True
         self._delete_diagram()
-        self.pipe._delete_agent()
+        self.llm._delete_agent()
         
         self.chart_tokenizer, self.chart_model, self.chart_image_processor, self.chart_context_len = load_pretrained_model(
             self.chart_model_name, 
@@ -114,28 +114,26 @@ class AgentWT1(AgentWT2):
             return verbal_description
     def describe_diagram(self):
         with torch.no_grad():
-            prompt = f"<|user|>\n<image>\n{self.description}. Extract the features in it.\n<|assistant|>\n"
-            outputs = self.pipe(self.image, prompt=prompt, generate_kwargs={"max_new_tokens": 1000})
-            return outputs
+            prompt = f"<|user|>\n<image>\n{str(self.description)}. Extract the features in it.\n<|assistant|>\n"
+            outputs = self.diagram_pipe(self.image, prompt=prompt, generate_kwargs={"max_new_tokens": 1000})
+            return outputs[0]['generated_text']
     
     def _process_image(self, image_path):
         if isinstance(image_path, str):
             image = Image.open(image_path)
-            image = np.array(image)
+            # image = np.array(image)
         return image
     
     def show_image(self):
         self.image.show()
     
-    def generate_response(self, image_path: str, essay_topic: str, student_response: str, is_rescore=False, is_chart = None):
-        
-        image = self._process_image(image_path)
+    def generate_response(self, image_path: str, essay_topic: str, student_response: str, is_rescore = True, is_chart = None):
         
         if self.generated:
             print("Already generated, clearing messages if you want to generate again")
             return self.messages[-1]['content']
         
-        self.image = image
+        self.image = self._process_image(image_path)
         self.image_path = image_path
         self.rescore = is_rescore
         self.essay = student_response
@@ -169,8 +167,8 @@ class AgentWT1(AgentWT2):
         #     self.incontext_prompt(essay_topic, student_response)
         
         self.generated = True
-        output = self.pipe(self.messages, **self.generation_args)
-        self.messages.append({"role": self.role, "content": output[0]['generated_text']},)
+        output = self.llm(self.messages, **self.generation_args)
+        self.messages.append({"role": self.role, "content": output},)
         # return output[0]['generated_text']
         
         adjusted_output = self._until_correct()

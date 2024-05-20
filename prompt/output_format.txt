@@ -1,7 +1,7 @@
-**General: score**
+**General: {score}**
 Overall Explanation:
 `Your detailed explanation`
-**metric_name : score**
+**metric_name : {score}**
 Explanation: 
 `Your detailed explanation`
 
