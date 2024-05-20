@@ -75,8 +75,8 @@ class BedRockLLMs:
     def __init__(self,
                 model_name = "meta-llama/Meta-Llama-3-8B-Instruct", 
                 model_id = "meta.llama3-8b-instruct-v1:0",
-                access_key = "AKIAYDTCLPOFHMIC4GWJ",
-                secret_key = "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",
+                access_key = None,
+                secret_key = None,
                  ) -> None:
         self.client = boto3.client(service_name='bedrock-runtime', region_name="us-west-2", aws_access_key_id=access_key, aws_secret_access_key=secret_key)
         self.model_name = model_name
