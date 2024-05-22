@@ -132,7 +132,7 @@ Topic:
 {essay_topic}
 Description of the chart or diagram:
 {verbal_description}
-Report: 
+Student's Report: 
 {student_response}
 Make sure that you follow the guideline to grade this essay, and do the correct evaluation of general score.
 Let's evaluate step by step.
@@ -144,7 +144,7 @@ def get_incontext_prompt(topic, example_essay):
 You will have to give comment to this IELTS WRITING task 2 essay.
 Topic: 
 {topic}
-Essay:
+Student's Essay:
 {example_essay}
 """
     return incontext_prompt
