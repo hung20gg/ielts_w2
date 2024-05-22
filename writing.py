@@ -37,11 +37,11 @@ class AgentWT2:
             self.generation_args = {
                 "max_new_tokens": 2000,
                 "return_full_text": False,
-                "temperature": 0.6,
+                "temperature": 0.4,
                 "top_p":0.9,
                 "do_sample": True,  
             }
-        self.mode = 'easy'
+        self.mode = 'harsh'
         
         self.is_rag = rag
         if rag:
@@ -53,14 +53,10 @@ class AgentWT2:
     def _setup_system_messages(self):
         if 'llama' in self.model_name:
             self.mode = 'harsh'
-            self.system_messages = [
-                {"role": "system", "content": self.system_prompt},
-            ]
-        else:
-            self.system_messages = [
-                {"role": "user", "content": self.system_prompt},
-                {"role": self.role, "content": "Sure, I will be happy to help you with that"},
-            ]
+        self.system_messages = [
+            {"role": "system", "content": self.system_prompt},
+        ]
+
         
     def setup_rag(self, model_embedding='sentence-transformers/all-mpnet-base-v2', df_path='data/lookup_essay.csv'):
         self.is_rag = True

@@ -1,44 +1,108 @@
 from PIL import Image
 import numpy as np
-from transformers import pipeline
+from transformers import AutoModelForCausalLM, AutoProcessor, BitsAndBytesConfig
 import gc
 import torch
 
 from .utils.extract import clean_output
 from .utils.prompt import get_system_prompt_wt1, get_instruction_prompt_wt1
 
-from tinychart.model.builder import load_pretrained_model
-from tinychart.mm_utils import get_model_name_from_path
-from tinychart.eval.run_tiny_chart import inference_model
-
 
 from .writing import AgentWT2
+
+class VisionModel:
+    def __init__(self, model_id, quantization='auto', initialize = False, allow_delete = True):
+        self.model_id = model_id
+        self.quantization = quantization
+        self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
+        
+        self.model = None
+        self.processor = None
+        self.is_agent_initialized = False
+        self.allow_delete = allow_delete
+        
+        self.generation_args = { 
+            "max_new_tokens": 500, 
+            "temperature": 0.3, 
+            "do_sample": False, 
+        }
+        self.processor = AutoProcessor.from_pretrained(self.model_id, trust_remote_code=True)
+        
+        if initialize:
+            self._initialize_vision_model()
+    
+    def _initialize_vision_model(self):   
+        quantize_config = None
+        if self.quantization == 'int4':
+            print("Using int4")
+            quantize_config = BitsAndBytesConfig(
+                load_in_4bit=True,
+                bnb_4bit_compute_dtype=torch.bfloat16
+                )
+        self.model = AutoModelForCausalLM.from_pretrained(self.model_id, 
+                                                            device_map=self.device, 
+                                                            trust_remote_code=True, 
+                                                            torch_dtype="auto", 
+                                                            quantization_config=quantize_config)
+        
+        self.is_agent_initialized = True
+
+    def _delete_vision_model(self):
+        if self.is_agent_initialized and self.allow_delete:
+            del self.processor
+            del self.model
+            gc.collect()
+            torch.cuda.empty_cache() 
+            self.is_agent_initialized = False
+            print("Vision model deleted")
+            
+    def __call__(self, description, image, is_chart = True):
+        if not self.is_agent_initialized:
+            self._initialize_vision_model()
+            
+        if isinstance(image, str):
+            image = Image.open(image)
+        
+        messages = [ 
+            {"role": "user", "content": f"<|image_1|>\n{description}. Can you provide insightful, detail and precise information about the {'chart' if is_chart else 'diagram'} (you can ignore the color)?"}, 
+        ] 
+        with torch.no_grad():
+            prompt = self.processor.tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
+            inputs = self.processor(prompt, [image], return_tensors="pt").to(self.device) 
+            
+            generate_ids = self.model.generate(**inputs, eos_token_id=self.processor.tokenizer.eos_token_id, **self.generation_args) 
+            
+            generate_ids = generate_ids[:, inputs['input_ids'].shape[1]:]
+            response = self.processor.batch_decode(generate_ids, skip_special_tokens=True, clean_up_tokenization_spaces=False)[0] 
+            
+            return response.split('!')[-1].strip()
+            
 
 class AgentWT1(AgentWT2):
     def __init__(self, pipe, 
                  role = 'assistant', # Chatbot role
                  agent = 'task1',
-                 diagram_model = "xtuner/llava-phi-3-mini-hf",
-                 chart_model = "mPLUG/TinyChart-3B-768",
+                 vision_model = "microsoft/Phi-3-vision-128k-instruct",
                  model_embedding = 'sentence-transformers/all-mpnet-base-v2',
                  explain_metric = False, 
                  verbose = False,
-                 rag = False, 
+                 rag = False,
+                 vision_quantization = 'auto', 
+                 initialize = False, 
+                 allow_delete = True,
                  **generation_args,
                  ) -> None:
         
         super().__init__(pipe, role, agent, model_embedding, explain_metric, verbose, rag, **generation_args)
         
-        self.diagram_model_name = diagram_model
-        self.chart_model_name = chart_model
+        self.vision_model_name = vision_model
         self.agent = 'task1'
-        
-        self.is_diagram = False
-        self.is_chart = False
 
-        self.diagram_pipe = None
+        self.vision_model = VisionModel(self.vision_model_name, quantization=vision_quantization, initialize=initialize, allow_delete=allow_delete)
+        self.allow_delete = allow_delete
         
         self.system_prompt = self.get_system_prompt()
+        
         
         if generation_args:
             self.generation_args = generation_args
@@ -57,66 +121,16 @@ class AgentWT1(AgentWT2):
     def get_instruction_prompt(self):
         return get_instruction_prompt_wt1(self.topic, self.essay, self.verbal_description)
         
-    def _initialize_diagram(self):
+    
+    def _delete_vision_model(self):
+        if self.llm.host == 'local':
+            self.vision_model._delete_vision_model()
+                
         
-        self.is_diagram = True
-        self._delete_chart()
-        self.llm._delete_agent()
-        
-        self.diagram_pipe = pipeline("image-to-text",
-            model = self.diagram_model_name,
-            torch_dtype=torch.bfloat16, device=0
-        )
-        
-    def _initialize_chart(self):
-        
-        self.is_chart = True
-        self._delete_diagram()
-        self.llm._delete_agent()
-        
-        self.chart_tokenizer, self.chart_model, self.chart_image_processor, self.chart_context_len = load_pretrained_model(
-            self.chart_model_name, 
-            model_base=None,
-            model_name=get_model_name_from_path(self.chart_model_name),
-            device="cuda"
-        )
-        
-    def _delete_diagram(self):
-        if self.is_diagram:
-            del self.diagram_pipe
-            self.is_diagram = False
-            
-            gc.collect()
-            torch.cuda.empty_cache() 
-            print("Diagram deleted")
-            
-    def _delete_chart(self):
-        if self.is_chart:
-            del self.chart_model
-            del self.chart_tokenizer
-            del self.chart_image_processor
-            del self.chart_context_len
-            self.is_chart = False
-            
-            gc.collect()
-            torch.cuda.empty_cache() 
-            print("Chart deleted")
-            
-    def _delete_agent(self):
-        self._delete_diagram()
-        self._delete_chart()
-        print("Agent deleted")
-        
-    def describe_chart(self):
-        with torch.no_grad():
-            verbal_description = inference_model([self.image_path], self.description + '. Describe it.', 
-                                                 self.chart_model, self.chart_tokenizer, self.chart_image_processor, self.chart_context_len, conv_mode="phi", max_new_tokens=2048)
-            return verbal_description
-    def describe_diagram(self):
-        with torch.no_grad():
-            prompt = f"<|user|>\n<image>\n{str(self.description)}. Extract the features in it.\n<|assistant|>\n"
-            outputs = self.diagram_pipe(self.image, prompt=prompt, generate_kwargs={"max_new_tokens": 1000})
-            return outputs[0]['generated_text']
+    def describe_image(self, chart = True):
+        if self.allow_delete:
+            self.llm._delete_agent()
+        return self.vision_model(self.description, self.image_path, chart)
     
     def _process_image(self, image_path):
         if isinstance(image_path, str):
@@ -148,15 +162,11 @@ class AgentWT1(AgentWT2):
                     is_chart = True
                     break
                 
-        if is_chart:
-            self._initialize_chart()
-            verbal_description = self.describe_chart()
-        else:
-            self._initialize_diagram()
-            verbal_description = self.describe_diagram()
+        
+        verbal_description = self.describe_image(is_chart)
         
         self.verbal_description = verbal_description
-        self._delete_agent()
+        self._delete_vision_model()
         # Some prompt here
         
         self.instruction_prompt = self.get_instruction_prompt()

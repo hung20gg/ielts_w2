@@ -76,7 +76,7 @@ Your output format should be like this:
 Here is some tips for you:
 - Most of the essay should be written in the third person.
 - Be easy on grading essay.
-- The essay's grade range is mostly around 5.0 - 7.5.
+- The essay's grade range is mostly around 5.5 - 7.5.
 - Every essay that has more than 250 words with little spelling or grammatical errors will score at least a 5.0.
 - Any attempt of using complex sentences might have at least 4.5 in Grammatical Range and Accuracy.
 - The overall score should be the mean value of 4 metric scores, round down to .0 and .5, so make sure your evaluation right.
@@ -104,7 +104,7 @@ Your output format should be like this:
 Here is some tips for you:
 - Most of the essay should be written in the third person.
 - Be easy on grading essay.
-- The essay's grade range is mostly around 5.0 to 7.5.
+- The essay's grade range is mostly around 5.5 to 7.5.
 - Every essay that has more than 250 words with little spelling or grammatical errors will score at least a 5.0.
 - Any attempt of using complex sentences might have at least 4.5 in Grammatical Range and Accuracy.
 - The overall score should be the mean value of 4 metric scores, round down to .0 and .5, so make sure your evaluation right.
@@ -294,5 +294,26 @@ def convert_format(data, has_system=True):
             assistant_message = item["content"]
             prompt += f"{assistant_message}\n<|eot_id|>"
 
-
     return prompt.rstrip("\n")
+
+def convert_non_system_prompts(messages):
+    new_messages = []
+    if messages[0]['role'] == 'system':
+        system_prompt = messages[0]['content']
+        for i in range(1,len(messages)):
+            message = messages[i]['content']
+            if i == 1:
+                message = system_prompt + '\n' + message
+            new_messages.append({"role": messages[i]['role'], "content": message})
+        return new_messages
+    return messages
+
+# if __name__ == "__main__":
+    # print(get_system_prompt_wt1())
+    # print(get_system_prompt())
+    # print(get_instruction_prompt("This is a topic", "This is a response"))
+    # print(get_instruction_prompt_wt1("This is a topic", "This is a response", "This is a description"))
+    # print(get_incontext_prompt("This is a topic", "This is an example essay"))
+    # print(get_output_suggestion_format())
+    # print(convert_format([{'role':'system','content':'You are a friendly assistant'},{'role':'user','content':'How are you today'}]))
+    # print(convert_non_system_prompts([{'role':'system','content':'You are a friendly assistant'},{'role':'user','content':'How are you today'}]))
