@@ -308,6 +308,16 @@ def convert_non_system_prompts(messages):
         return new_messages
     return messages
 
+def convert_to_multimodal_format(messages, has_system=True):
+    new_messages = []
+    if not has_system:
+        messages = convert_non_system_prompts(messages)
+    for i, item in enumerate(messages):
+        role = item["role"]
+        content = item["content"]
+        new_messages.append({"role": role, "content": [{'type':'text', 'text':content}]})
+    return new_messages
+
 # if __name__ == "__main__":
     # print(get_system_prompt_wt1())
     # print(get_system_prompt())

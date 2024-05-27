@@ -16,7 +16,7 @@ class AgentWT2:
                  model_embedding = 'sentence-transformers/all-mpnet-base-v2',
                  explain_metric = True, 
                  verbose = False,
-                 rag = False, **generation_args):
+                 rag = False):
         
         self.explain_metric = explain_metric
         self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
@@ -31,16 +31,7 @@ class AgentWT2:
         self.role = role
         self._setup_system_messages()
         
-        if generation_args:
-            self.generation_args = generation_args
-        else:
-            self.generation_args = {
-                "max_new_tokens": 2000,
-                "return_full_text": False,
-                "temperature": 0.4,
-                "top_p":0.9,
-                "do_sample": True,  
-            }
+        
         self.mode = 'harsh'
         
         self.is_rag = rag
@@ -147,7 +138,7 @@ class AgentWT2:
             proposed_correct_score = ((self.tr + self.cc + self.lr + self.gr)//2)/2
             add_prompt = {"role": "user", "content": f"Your score doesn't make sense. How can I get a {self.general} in general while I only get {self.tr} in Task Response, {self.cc} in Coherence and Cohesion, {self.lr} in Lexical Resource and {self.gr} in Grammatical Range and Accuracy. You need to check the grade of each criteria and overall score again. Maintain the output format"},
             self.messages.append(add_prompt[0])
-            output = self.llm(self.messages, **self.generation_args)
+            output = self.llm(self.messages)
             self.messages.append({"role": self.role, "content": output},)
             
             return output
@@ -164,7 +155,7 @@ class AgentWT2:
             
             add_prompt = {"role": "user", "content": f"Your score is not consistence and still does not sum up equally. You score this {self.essay_type} {self.tr} in Task Response, {self.cc} in Coherence and Cohesion, {self.lr} in Lexical Resource and {self.gr} in Grammatical Range and Accuracy, so the total score should be {proposed_correct_score}. You should grade the {self.essay_type} again, and maintain the output format"},
             self.messages.append(add_prompt[0])
-            output = self.llm(self.messages, **self.generation_args)
+            output = self.llm(self.messages)
             self.messages.append({"role": self.role, "content": output},)
             
             return output
@@ -175,7 +166,7 @@ class AgentWT2:
 
         add_prompt = {"role": "user", "content": f"Your score seem to have some mistake in term of logic. You should reevaluate your score and remain the output format."},
         self.messages.append(add_prompt[0])
-        output = self.llm(self.messages, **self.generation_args)
+        output = self.llm(self.messages)
         self.messages.append({"role": self.role, "content": output},)
         return output
     
@@ -184,7 +175,7 @@ class AgentWT2:
         
         self.messages.append({"role": "user", "content": f"Do you think you are too {self.mode}? Your explanation for each metric seems to be too {adj} and may not fit with its criteria. You should reevaluate your score and remain the output format and make sure all the criteria scores is integer and only general score can be float (round to .5)."})
         
-        output = self.llm(self.messages, **self.generation_args)
+        output = self.llm(self.messages)
         self.messages.append({"role": self.role, "content": output},)
         return output
     
@@ -219,7 +210,7 @@ class AgentWT2:
             
             add_prompt = {"role": "user", "content": f"Your score seem incorrect. {prompt_tr_score}{prompt_cc_score }{prompt_lr_score }{prompt_gr_score}. You should look again your score and make sure all the criteria scores is integer and only general score can be float (round to .5). Maintain the output format"},
             self.messages.append(add_prompt[0])
-            output = self.llm(self.messages, **self.generation_args)
+            output = self.llm(self.messages)
             self.messages.append({"role": self.role, "content": output},)
             return output
         else:
@@ -310,7 +301,7 @@ class AgentWT2:
             self.incontext_prompt(essay_topic, student_response)
         
         self.generated = True
-        output = self.llm(self.messages, **self.generation_args)
+        output = self.llm(self.messages)
         self.messages.append({"role": self.role, "content": output},)
         # return output
         
@@ -344,7 +335,7 @@ class AgentWT2:
         self.messages.append({"role": self.role, "content": first_output})
         self.messages.append({"role": "user", "content": f"Provide more in-depth feedback in the {self.essay_type}, list out all the mistake made in the {self.essay_type} and suggest how to improve it. It is good to list all the grammatical mistake such as spelling, punctuation, grammar. \n {self.output_suggestion}"})
         
-        output = self.llm(self.messages, **self.generation_args)
+        output = self.llm(self.messages)
         self.messages.append({"role": self.role, "content": output},)
         
         if not force_original:
@@ -362,11 +353,11 @@ class AgentWT2:
         
         if self.general <= MAX_TARGET - 0.5:
             self.messages.append({"role": "user", "content": f"Making adjustment directly into the {self.essay_type} to improve at least 1 score in each metric. {self.output_suggestion}"})
-            suggest_essay = self.llm(self.messages, **self.generation_args)
+            suggest_essay = self.llm(self.messages)
             
         else: 
             self.messages.append({"role": "user", "content": f"Making adjustment directly into the {self.essay_type} to optimize it. {self.output_suggestion}"})
-            suggest_essay = self.llm(self.messages, **self.generation_args)
+            suggest_essay = self.llm(self.messages)
             
         self.messages.append({"role": self.role, "content": suggest_essay},)
         
