@@ -177,7 +177,7 @@ class AgentWT1(AgentWT2):
         #     self.incontext_prompt(essay_topic, student_response)
         
         self.generated = True
-        output = self.llm(self.messages, **self.generation_args)
+        output = self.llm(self.messages)
         self.messages.append({"role": self.role, "content": output},)
         # return output[0]['generated_text']
         

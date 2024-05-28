@@ -4,15 +4,15 @@ from transformers import pipeline
 import gc
 import torch
 
-from .utils.extract import clean_output
-from .utils.prompt import get_system_prompt_wt1, get_instruction_prompt_wt1
+from ielts_scoring.utils.extract import clean_output
+from ielts_scoring.utils.prompt import get_system_prompt_wt1, get_instruction_prompt_wt1
 
 from tinychart.model.builder import load_pretrained_model
 from tinychart.mm_utils import get_model_name_from_path
 from tinychart.eval.run_tiny_chart import inference_model
 
 
-from .writing import AgentWT2
+from ielts_scoring.writing import AgentWT2
 
 class AgentWT1(AgentWT2):
     def __init__(self, pipe, 
@@ -167,7 +167,7 @@ class AgentWT1(AgentWT2):
         #     self.incontext_prompt(essay_topic, student_response)
         
         self.generated = True
-        output = self.llm(self.messages, **self.generation_args)
+        output = self.llm(self.messages)
         self.messages.append({"role": self.role, "content": output},)
         # return output[0]['generated_text']
         
