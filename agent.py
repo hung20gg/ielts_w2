@@ -22,7 +22,7 @@ class CoreLLMs:
 
             self.generation_args = {
                 "max_new_tokens": 2048,
-                "temperature": 0.2,
+                "temperature": 0.4,
                 "top_p": 0.9,
             }
         else:
@@ -76,7 +76,10 @@ class CoreLLMs:
         if 'llama' not in self.model_name.lower():
             message = convert_non_system_prompts(message)
         with torch.no_grad():
-            return self.pipe(message, **self.generation_args)[0]['generated_text']
+            response = self.pipe(message, **self.generation_args)[0]['generated_text']
+            if isinstance(response, str):
+                return response
+            return response[-1]['content']
 
 class BedRockLLMs:
     def __init__(self,
@@ -113,7 +116,7 @@ class BedRockLLMs:
             "prompt": prompt,
             # Optional inference parameters:
             "max_gen_len": 2048,
-            "temperature": 0.2,
+            "temperature": 0.4,
             "top_p": 0.9,
         }
         response = self.client.invoke_model(body=json.dumps(request), modelId=self.model_id, contentType='application/json')
