@@ -4,15 +4,15 @@ from transformers import pipeline
 import gc
 import torch
 
-from ielts_scoring.utils.extract import clean_output
-from ielts_scoring.utils.prompt import get_system_prompt_wt1, get_instruction_prompt_wt1
+from ielts_w2.utils.extract import clean_output
+from ielts_w2.utils.prompt import get_system_prompt_wt1, get_instruction_prompt_wt1
 
 from tinychart.model.builder import load_pretrained_model
 from tinychart.mm_utils import get_model_name_from_path
 from tinychart.eval.run_tiny_chart import inference_model
 
 
-from ielts_scoring.writing import AgentWT2
+from ielts_w2.writing import AgentWT2
 
 class AgentWT1(AgentWT2):
     def __init__(self, pipe, 
@@ -26,7 +26,7 @@ class AgentWT1(AgentWT2):
                  rag = False, 
                  **generation_args,
                  ) -> None:
-        
+        # Initialize the Agent
         super().__init__(pipe, role, agent, model_embedding, explain_metric, verbose, rag, **generation_args)
         
         self.diagram_model_name = diagram_model
